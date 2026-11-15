@@ -1,0 +1,44 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    { "Sid": "EcrLogin", "Effect": "Allow", "Action": "ecr:GetAuthorizationToken", "Resource": "*" },
+    {
+      "Sid": "PushImages",
+      "Effect": "Allow",
+      "Action": [
+        "ecr:BatchCheckLayerAvailability", "ecr:InitiateLayerUpload", "ecr:UploadLayerPart",
+        "ecr:CompleteLayerUpload", "ecr:PutImage", "ecr:BatchGetImage", "ecr:GetDownloadUrlForLayer"
+      ],
+      "Resource": "arn:aws:ecr:ap-northeast-2:${ACCT}:repository/${ME}-eta-*"
+    },
+    {
+      "Sid": "WriteModels",
+      "Effect": "Allow",
+      "Action": ["s3:PutObject", "s3:GetObject"],
+      "Resource": "arn:aws:s3:::${ME}-eta-models/models/*"
+    },
+    {
+      "Sid": "ListModels",
+      "Effect": "Allow",
+      "Action": "s3:ListBucket",
+      "Resource": "arn:aws:s3:::${ME}-eta-models",
+      "Condition": { "StringLike": { "s3:prefix": "models/*" } }
+    },
+    { "Sid": "FindInstance", "Effect": "Allow", "Action": "ec2:DescribeInstances", "Resource": "*" },
+    { "Sid": "SeeLogGroups", "Effect": "Allow", "Action": "logs:DescribeLogGroups", "Resource": "*" },
+    {
+      "Sid": "RunCommandOnOwnInstances",
+      "Effect": "Allow",
+      "Action": "ssm:SendCommand",
+      "Resource": "arn:aws:ec2:ap-northeast-2:${ACCT}:instance/*",
+      "Condition": { "StringEquals": { "aws:ResourceTag/Owner": "${ME}" } }
+    },
+    {
+      "Sid": "RunShellScriptDocument",
+      "Effect": "Allow",
+      "Action": "ssm:SendCommand",
+      "Resource": "arn:aws:ssm:ap-northeast-2::document/AWS-RunShellScript"
+    },
+    { "Sid": "ReadCommandResult", "Effect": "Allow", "Action": "ssm:GetCommandInvocation", "Resource": "*" }
+  ]
+}

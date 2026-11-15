@@ -1,0 +1,20 @@
+# 컨테이너 로그를 CloudWatch Logs 로. docker-compose.aws.yml 에 덧붙여 쓴다.
+# 로그 그룹(/<ME>/eta)이 없으면 컨테이너가 뜨지 않으므로, `lab deploy` 는 그룹이 있을 때만 이 파일을 함께 쓴다.
+x-logging: &logging
+  driver: awslogs
+  options:
+    awslogs-region: ap-northeast-2
+    awslogs-group: /${ME}/eta
+    tag: "{{.Name}}" # 로그 스트림 이름 = 컨테이너 이름 (eta-api-1 …)
+
+services:
+  web:
+    logging: *logging
+  api:
+    logging: *logging
+  db:
+    logging: *logging
+  proxy:
+    logging: *logging
+  certbot:
+    logging: *logging

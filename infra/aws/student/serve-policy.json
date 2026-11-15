@@ -1,0 +1,43 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "ReadModels",
+      "Effect": "Allow",
+      "Action": "s3:GetObject",
+      "Resource": "arn:aws:s3:::${ME}-eta-models/models/*"
+    },
+    {
+      "Sid": "ListModels",
+      "Effect": "Allow",
+      "Action": "s3:ListBucket",
+      "Resource": "arn:aws:s3:::${ME}-eta-models",
+      "Condition": { "StringLike": { "s3:prefix": "models/*" } }
+    },
+    {
+      "Sid": "WriteBackupsOnly",
+      "Effect": "Allow",
+      "Action": "s3:PutObject",
+      "Resource": "arn:aws:s3:::${ME}-eta-models/backups/*"
+    },
+    {
+      "Sid": "PullImages",
+      "Effect": "Allow",
+      "Action": ["ecr:BatchGetImage", "ecr:GetDownloadUrlForLayer", "ecr:BatchCheckLayerAvailability"],
+      "Resource": "arn:aws:ecr:ap-northeast-2:${ACCT}:repository/${ME}-eta-*"
+    },
+    { "Sid": "EcrLogin", "Effect": "Allow", "Action": "ecr:GetAuthorizationToken", "Resource": "*" },
+    {
+      "Sid": "WriteOwnLogs",
+      "Effect": "Allow",
+      "Action": ["logs:CreateLogStream", "logs:PutLogEvents"],
+      "Resource": "arn:aws:logs:ap-northeast-2:${ACCT}:log-group:/${ME}/eta:*"
+    },
+    {
+      "Sid": "ReadOwnParameters",
+      "Effect": "Allow",
+      "Action": "ssm:GetParametersByPath",
+      "Resource": "arn:aws:ssm:ap-northeast-2:${ACCT}:parameter/${ME}/eta"
+    }
+  ]
+}

@@ -1,0 +1,78 @@
+# push 한 번 → 테스트 → 학습·게이트 → S3 승격 → 이미지 빌드(ECR) → EC2 갱신
+# 저장소에 AWS 키가 없다. GitHub 이 주는 OIDC 토큰으로 IAM 역할을 빌린다.
+#
+# 저장소 Variables (Settings → Secrets and variables → Actions → Variables) — 비밀이 아니다
+#   ME            내 아이디 (자원 이름의 접두어. 예: claude)
+#   AWS_ROLE_ARN  CI 가 빌릴 역할 (예: arn:aws:iam::<계정>:role/claude-eta-ci)
+# 둘 다 없으면(= AWS 를 아직 쓰지 않는 저장소) 테스트만 돈다.
+name: aws
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  id-token: write # OIDC 토큰을 받는다
+  contents: read
+
+env:
+  AWS_REGION: ap-northeast-2
+  ME: ${{ vars.ME }}
+
+concurrency:
+  group: aws-deploy # 배포는 한 번에 하나씩
+  cancel-in-progress: false
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v7
+      - run: uv run --locked --group ml pytest -q
+
+  model:
+    needs: test
+    if: vars.AWS_ROLE_ARN != ''
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v7
+      - run: uv run --locked --group ml python -m training.train_sklearn
+      - run: uv run --locked python -m training.validate_model # 실패하면 여기서 멈춘다 → 올리지 않는다
+      - uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+          mask-aws-account-id: true
+      - name: 모델 올리고 승격
+        run: |
+          VERSION=${GITHUB_SHA::7}  # 판 이름 = 커밋 sha
+          aws s3 cp artifacts/ "s3://${ME}-eta-models/models/sklearn/${VERSION}/" --recursive
+          uv run --locked --group ml lab promote "${VERSION}"
+
+  deploy:
+    needs: model
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v7
+      - uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+          mask-aws-account-id: true
+      - id: ecr
+        uses: aws-actions/amazon-ecr-login@v2
+      - name: 이미지 빌드·push (태그 = 커밋 sha)
+        env:
+          REGISTRY: ${{ steps.ecr.outputs.registry }}
+        run: |
+          TAG=${GITHUB_SHA::7}
+          docker build --provenance=false -t "$REGISTRY/${ME}-eta-api:$TAG" -f api/Dockerfile .
+          docker build --provenance=false -t "$REGISTRY/${ME}-eta-web:$TAG" ./web
+          docker push "$REGISTRY/${ME}-eta-api:$TAG"
+          docker push "$REGISTRY/${ME}-eta-web:$TAG"
+      - name: EC2 갱신 (SSM Run Command)
+        run: uv run --locked --group ml lab deploy "${GITHUB_SHA::7}"

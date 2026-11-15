@@ -1,0 +1,40 @@
+[project]
+name = "eta-mini"
+version = "0.1.0"
+description = "배달 도착 예정시간(ETA) 미니 서비스 — React + FastAPI + 세션 인증 + PostgreSQL"
+requires-python = ">=3.14"
+dependencies = [
+    "fastapi>=0.162.0",
+    "uvicorn>=0.54.0",
+    "sqlalchemy>=2.0.40",
+    "psycopg[binary]>=3.3",
+    "argon2-cffi>=25.1.0",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.2.0",
+    "httpx2>=2.16.0",
+]
+# 학습(training/) 과 「S3 에서 모델 받아 서빙」에 쓴다. 규칙(rule) 만 쓸 때는 필요 없다.
+ml = [
+    "boto3[crt]>=1.40",  # crt : 노트북에서 `aws login` 자격 증명을 읽는 데 필요. EC2(인스턴스 프로파일)에서는 없어도 된다
+    "joblib>=1.6.0",
+    "scikit-learn>=1.9.1",
+]
+
+[project.scripts]
+lab = "infra.aws.lab:main"  # AWS 실습 도우미. uv run --group ml lab --help
+
+[build-system]
+requires = ["uv_build>=0.8"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+module-name = ["api", "training", "infra"]
+module-root = ""
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["api/tests"]
+addopts = "-ra"
